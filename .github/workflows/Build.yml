@@ -25,17 +25,24 @@ jobs:
           SETTINGS=$(find /tmp/src -name settings.gradle.kts -not -path '*/.git/*' | head -1)
           if [ -z "$SETTINGS" ]; then echo "Không tìm thấy settings.gradle.kts"; exit 1; fi
           echo "ROOT=$(dirname "$SETTINGS")" >> "$GITHUB_ENV"
-          if [ -f release.keystore ]; then
-            cp release.keystore "$(dirname "$SETTINGS")/release.keystore"
-            echo "Dùng keystore cố định: bản mới sẽ cập nhật đè bản cũ."
-          else
-            echo "::warning::Chưa có release.keystore ở gốc repo - APK ký bằng khóa tạm, không cập nhật đè được bản cũ."
-          fi
 
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: 17
+
+      - name: Chuẩn bị keystore (có sẵn thì dùng, chưa có thì tự tạo)
+        run: |
+          if [ -f release.keystore ]; then
+            cp release.keystore "$ROOT/release.keystore"
+            echo "Dùng keystore cố định: bản mới sẽ cập nhật đè bản cũ."
+          else
+            keytool -genkeypair -keystore "$ROOT/release.keystore" -alias aimanager \
+              -keyalg RSA -keysize 2048 -validity 10000 \
+              -storepass aimanager -keypass aimanager -dname "CN=AI Manager"
+            echo "KS_NEW=1" >> "$GITHUB_ENV"
+            echo "::warning::Chưa có release.keystore ở gốc repo. Đã tạo khóa mới - hãy tải artifact release-keystore về và đưa file lên gốc repo."
+          fi
 
       - uses: gradle/actions/setup-gradle@v4
         with:
@@ -49,3 +56,10 @@ jobs:
         with:
           name: AIManager-debug-apk
           path: ${{ env.ROOT }}/app/build/outputs/apk/debug/*.apk
+
+      - name: Lưu keystore vừa tạo (chỉ lần đầu)
+        if: env.KS_NEW == '1'
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-keystore
+          path: ${{ env.ROOT }}/release.keystore
