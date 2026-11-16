@@ -25,12 +25,6 @@ jobs:
           SETTINGS=$(find /tmp/src -name settings.gradle.kts -not -path '*/.git/*' | head -1)
           if [ -z "$SETTINGS" ]; then echo "Không tìm thấy settings.gradle.kts"; exit 1; fi
           echo "ROOT=$(dirname "$SETTINGS")" >> "$GITHUB_ENV"
-          if [ -f release.keystore ]; then
-            cp release.keystore "$(dirname "$SETTINGS")/release.keystore"
-            echo "Dùng keystore cố định: bản mới sẽ cập nhật đè bản cũ."
-          else
-            echo "::warning::Chưa có release.keystore ở gốc repo - APK ký bằng khóa tạm, không cập nhật đè được bản cũ."
-          fi
 
       - uses: actions/setup-java@v4
         with:
@@ -41,11 +35,12 @@ jobs:
         with:
           gradle-version: 8.9
 
-      - name: Build debug APK
+      - name: Build release APK
         working-directory: ${{ env.ROOT }}
-        run: gradle assembleDebug --no-daemon --stacktrace
+        run: gradle assembleRelease --no-daemon --stacktrace
 
       - uses: actions/upload-artifact@v4
         with:
-          name: AIManager-debug-apk
-          path: ${{ env.ROOT }}/app/build/outputs/apk/debug/*.apk
+          name: AIManager-apk
+          path: ${{ env.ROOT }}/app/build/outputs/apk/release/*.apk
+
